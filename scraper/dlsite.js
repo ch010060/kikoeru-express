@@ -106,6 +106,12 @@ const scrapeStaticWorkMetadataFromDLsite = (id, language) => new Promise((resolv
           };
         }
       }
+      if(typeof work.series == 'undefined'){
+          work.series = {
+              id: 0,
+              name: ''
+          };
+      }
       
       // 标签
         workOutline.children('tbody').children('tr').children('th')

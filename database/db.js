@@ -30,6 +30,7 @@ const insertWorkMetadata = work => knex.transaction(trx => trx.raw(
       circle_id: work.circle.id,
       nsfw: work.nsfw,
       release: work.release,
+      series_id: work.series.id,
 
       dl_count: work.dl_count,
       price: work.price,
@@ -44,6 +45,14 @@ const insertWorkMetadata = work => knex.transaction(trx => trx.raw(
   .then(() => {
     // Now that work is in the database, insert relationships
     const promises = [];
+
+    promises.push(trx.raw(
+        trx('t_series')
+            .insert({
+                id: work.series.id,
+                name: work.series.name
+            }).toString().replace('insert', 'insert or ignore')
+    ))
 
     for (let i = 0; i < work.tags.length; i += 1) {
       promises.push(trx.raw(
@@ -112,6 +121,14 @@ const updateWorkMetadata = (work, options = {}) => knex.transaction(async (trx) 
       await trx.raw('INSERT OR IGNORE INTO t_tag(id, name) VALUES (?, ?)', [tag.id, tag.name]);
       await trx.raw('INSERT OR IGNORE INTO r_tag_work(tag_id, work_id) VALUES (?, ?)', [tag.id, work.id]);
     }
+  }
+  if (options.includeSeries || options.refreshAll) {
+    await trx('t_work')
+        .where('id', '=', work.id)
+        .update({
+            series_id: work.series.id
+        })
+    await trx.raw('INSERT OR IGNORE INTO t_series(id, name) VALUES (?, ?)', [work.series.id, work.series.name])
   }
 
   // Fix a bug caused by DLsite changes
@@ -278,6 +295,11 @@ const getWorksBy = ({id, field, username = ''} = {}) => {
         .leftJoin(ratingSubQuery, 'userrate.work_id', 'staticMetadata.id')
         .where('id', 'in', workIdQuery);
 
+  case 'serie':
+      return knex('staticMetadata').select(['staticMetadata.*', 'userrate.rating AS userRating', 'userrate.progress AS userProgress'])
+          .leftJoin(ratingSubQuery, 'userrate.work_id', 'staticMetadata.id')
+          .where('series_id', '=', id);
+
     default:
       return knex('staticMetadata').select(['staticMetadata.*', 'userrate.rating AS userRating', 'userrate.progress AS userProgress'])
         .leftJoin(ratingSubQuery, 'userrate.work_id', 'staticMetadata.id');
@@ -302,6 +324,7 @@ const getWorksByKeyWord = ({keyword, username = 'admin'} = {}) => {
   }
 
   const circleIdQuery = knex('t_circle').select('id').where('name', 'like', `%${keyword}%`);
+  const seriesIdQuery = knex('t_series').select('id').where('name', 'like', `%${keyword}%`);
 
   const tagIdQuery = knex('t_tag').select('id').where('name', 'like', `%${keyword}%`);
   const vaIdQuery = knex('t_va').select('id').where('name', 'like', `%${keyword}%`);
@@ -315,6 +338,7 @@ const getWorksByKeyWord = ({keyword, username = 'admin'} = {}) => {
     .leftJoin(ratingSubQuery, 'userrate.work_id', 'staticMetadata.id')
     .where('title', 'like', `%${keyword}%`)
     .orWhere('circle_id', 'in', circleIdQuery)
+    .orWhere('series_id', 'in', seriesIdQuery)
     .orWhere('id', 'in', workIdQuery);
 };
 
@@ -447,7 +471,7 @@ const getWorksWithReviews = async ({username = '', limit = 1000, offset = 0, ord
 };
 
 const getMetadata = ({field = 'circle', id} = {}) => {
-  const validFields = ['circle', 'tag', 'va'];
+  const validFields = ['circle', 'tag', 'va', 'series'];
   if (!validFields.includes(field)) throw new Error('无效的查询域');
   return knex(`t_${field}`)
     .select('*')

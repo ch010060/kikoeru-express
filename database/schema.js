@@ -80,7 +80,9 @@ const createSchema = () => knex.schema
           t_work.title,
           t_work.circle_id,
           t_circle.name,
+          t_series.name,
           json_object('id', t_work.circle_id, 'name', t_circle.name) AS circleObj,
+          json_object('id', t_work.series_id, 'name', t_series.name) AS seriesObj,
           t_work.nsfw,
           t_work.release,
           t_work.dl_count,
@@ -90,9 +92,11 @@ const createSchema = () => knex.schema
           t_work.rate_average_2dp,
           t_work.rate_count_detail,
           t_work.rank,
-          t_work.insert_time
+          t_work.insert_time,
+          t_work.series_id
         FROM t_work
         JOIN t_circle ON t_circle.id = t_work.circle_id
+        LEFT JOIN t_series ON t_series.id = t_work.series_id
       ) AS baseQuery
       JOIN r_va_work ON r_va_work.work_id = baseQuery.id
       JOIN t_va ON t_va.id = r_va_work.va_id
@@ -131,7 +135,7 @@ const createTableHistory = () => knex.schema
   console.log(' * 成功构建数据库结构.');
 })
 .catch((err) => {
-  if (err.toString().indexOf('table `t_circle` already exists') !== -1) {
+  if (err.toString().indexOf('table `t_history` already exists') !== -1) {
     console.log(' * 数据库结构已经存在.');
   } else {
     console.log(err);
@@ -159,7 +163,9 @@ const addInsertTimeToTableWork =  () => knex.schema
             t_work.title,
             t_work.circle_id,
             t_circle.name,
+            t_series.name,
             json_object('id', t_work.circle_id, 'name', t_circle.name) AS circleObj,
+            json_object('id', t_work.series_id, 'name', t_series.name) AS seriesObj,
             t_work.nsfw,
             t_work.release,
             t_work.dl_count,
@@ -169,9 +175,11 @@ const addInsertTimeToTableWork =  () => knex.schema
             t_work.rate_average_2dp,
             t_work.rate_count_detail,
             t_work.rank,
-            t_work.insert_time
-          FROM t_work
-          JOIN t_circle ON t_circle.id = t_work.circle_id
+            t_work.insert_time,
+            t_work.series_id
+        FROM t_work
+        JOIN t_circle ON t_circle.id = t_work.circle_id
+        LEFT JOIN t_series ON t_series.id = t_work.series_id
         ) AS baseQuery
         JOIN r_va_work ON r_va_work.work_id = baseQuery.id
         JOIN t_va ON t_va.id = r_va_work.va_id
@@ -194,4 +202,119 @@ const addInsertTimeToTableWorkIfNotExists = () => knex.schema.hasColumn("t_work"
   }
 })
 
-module.exports = { createSchema, createTableHistoryIfNotExists, addInsertTimeToTableWorkIfNotExists, dbVersion };
+const addSeriesIdToTableWork =  () => knex.schema
+    .raw("ALTER TABLE t_work ADD COLUMN series_id int DEFAULT null")
+    .raw("DROP VIEW staticMetadata")
+    .raw(`
+      CREATE VIEW IF NOT EXISTS staticMetadata AS
+      SELECT baseQueryWithVA.*,
+        json_object('tags', json_group_array(json_object('id', t_tag.id, 'name', t_tag.name))) AS tagObj
+      FROM (
+        SELECT baseQuery.*,
+          json_object('vas', json_group_array(json_object('id', t_va.id, 'name', t_va.name))) AS vaObj
+        FROM (
+          SELECT t_work.id, 
+            t_work.title,
+            t_work.circle_id,
+            t_circle.name,
+            t_series.name,
+            json_object('id', t_work.circle_id, 'name', t_circle.name) AS circleObj,
+            json_object('id', t_work.series_id, 'name', t_series.name) AS seriesObj,
+            t_work.nsfw,
+            t_work.release,
+            t_work.dl_count,
+            t_work.price,
+            t_work.review_count,
+            t_work.rate_count,
+            t_work.rate_average_2dp,
+            t_work.rate_count_detail,
+            t_work.rank,
+            t_work.insert_time,
+            t_work.series_id
+        FROM t_work
+        JOIN t_circle ON t_circle.id = t_work.circle_id
+        LEFT JOIN t_series ON t_series.id = t_work.series_id
+        ) AS baseQuery
+        JOIN r_va_work ON r_va_work.work_id = baseQuery.id
+        JOIN t_va ON t_va.id = r_va_work.va_id
+        GROUP BY baseQuery.id
+      ) AS baseQueryWithVA
+      LEFT JOIN r_tag_work ON r_tag_work.work_id = baseQueryWithVA.id
+      LEFT JOIN t_tag ON t_tag.id = r_tag_work.tag_id
+      GROUP BY baseQueryWithVA.id;
+`)
+    .then(() => {
+      console.log(' * 成功修改数据库schema.');
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+
+const addSeriesIdToTableWorkIfNotExists = () => knex.schema.hasColumn("t_work", "series_id").then(function(exists) {
+  if (!exists) {
+    addSeriesIdToTableWork();
+  }
+})
+
+const createTableSeries = () => knex.schema
+    .createTable('t_series', (table) => {
+      table.integer('id').primary();
+      table.string('name');             // 系列名称
+    })
+    .raw("DROP VIEW staticMetadata")
+    .raw(`
+      CREATE VIEW IF NOT EXISTS staticMetadata AS
+      SELECT baseQueryWithVA.*,
+        json_object('tags', json_group_array(json_object('id', t_tag.id, 'name', t_tag.name))) AS tagObj
+      FROM (
+        SELECT baseQuery.*,
+          json_object('vas', json_group_array(json_object('id', t_va.id, 'name', t_va.name))) AS vaObj
+        FROM (
+          SELECT t_work.id, 
+            t_work.title,
+            t_work.circle_id,
+            t_circle.name,
+            t_series.name,
+            json_object('id', t_work.circle_id, 'name', t_circle.name) AS circleObj,
+            json_object('id', t_work.series_id, 'name', t_series.name) AS seriesObj,
+            t_work.nsfw,
+            t_work.release,
+            t_work.dl_count,
+            t_work.price,
+            t_work.review_count,
+            t_work.rate_count,
+            t_work.rate_average_2dp,
+            t_work.rate_count_detail,
+            t_work.rank,
+            t_work.insert_time,
+            t_work.series_id
+        FROM t_work
+        JOIN t_circle ON t_circle.id = t_work.circle_id
+        LEFT JOIN t_series ON t_series.id = t_work.series_id
+        ) AS baseQuery
+        JOIN r_va_work ON r_va_work.work_id = baseQuery.id
+        JOIN t_va ON t_va.id = r_va_work.va_id
+        GROUP BY baseQuery.id
+      ) AS baseQueryWithVA
+      LEFT JOIN r_tag_work ON r_tag_work.work_id = baseQueryWithVA.id
+      LEFT JOIN t_tag ON t_tag.id = r_tag_work.tag_id
+      GROUP BY baseQueryWithVA.id;
+`)
+    .then(() => {
+      console.log(' * 成功构建数据库结构.');
+    })
+    .catch((err) => {
+      if (err.toString().indexOf('table `t_series` already exists') !== -1) {
+        console.log(' * 数据库结构已经存在.');
+      } else {
+        console.log(err);
+      }
+    });
+
+const createTableSeriesIfNotExists = () => knex.schema.hasTable('t_series').then(function(exists) {
+  if (!exists) {
+    createTableSeries();
+  }
+});
+
+module.exports = { createSchema, createTableHistoryIfNotExists, addInsertTimeToTableWorkIfNotExists, addSeriesIdToTableWorkIfNotExists, createTableSeriesIfNotExists, dbVersion };

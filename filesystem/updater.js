@@ -23,6 +23,11 @@ const argv = yargs(hideBin(process.argv))
       description: 'Refresh dynamic metadata and voice actors',
       type: 'boolean',
     })
+    .option('includeSeries', {
+        alias: 'series',
+        description: 'Refresh dynamic metadata and series',
+        type: 'boolean',
+    })
     .argv;
 
 const updateOptions = {};
@@ -35,6 +40,8 @@ if (argv.refreshAll) {
   updateOptions.includeTags = true
 } else if (argv.includeVA) {
   updateOptions.includeVA = true
+} else if (argv.includeSeries) {
+  updateOptions.includeSeries = true
 }
 
 performUpdate(updateOptions)

@@ -130,11 +130,15 @@ router.get('/works',
 });
 
 // GET name of a circle/tag/VA
-router.get('/:field(circle|tag|va)s/:id',
-  param('field').isIn(['circle', 'tag', 'va']),
+router.get('/:field(circle|tag|va|serie)s/:id',
+  param('field').isIn(['circle', 'tag', 'va', 'serie']),
   (req, res, next) => {
     // In case regex matching goes wrong
     if(!isValidRequest(req, res)) return;
+
+    if(req.params.field === 'serie'){
+        req.params.field = 'series'
+    }
 
     return db.getMetadata({field: req.params.field, id: req.params.id})
       .then(item => {
@@ -144,7 +148,8 @@ router.get('/:field(circle|tag|va)s/:id',
           const errorMessage= {
             'circle': `社团${req.params.id}不存在`,
             'tag': `标签${req.params.id}不存在`,
-            'va': `声优${req.params.id}不存在`
+            'va': `声优${req.params.id}不存在`,
+            'series': `系列${req.params.id}不存在`,
           }
           res.status(404).send({error: errorMessage[req.params.field]})
         }
@@ -195,8 +200,8 @@ router.get('/search/:keyword?', async (req, res, next) => {
 });
 
 // GET list of work ids, restricted by circle/tag/VA
-router.get('/:field(circle|tag|va)s/:id/works',
-  param('field').isIn(['circle', 'tag', 'va']),
+router.get('/:field(circle|tag|va|serie)s/:id/works',
+  param('field').isIn(['circle', 'tag', 'va', 'serie']),
   // eslint-disable-next-line no-unused-vars
   async (req, res, next) => {
     // In case regex matching goes wrong
