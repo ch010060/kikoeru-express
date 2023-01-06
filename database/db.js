@@ -294,7 +294,7 @@ const getWorksByKeyWord = ({keyword, username = 'admin'} = {}) => {
   .join('t_work', 't_work.id', 't_review.work_id')
   .where('t_review.user_name', username).as('userrate')
 
-  const workid = keyword.match(/((R|r)(J|j))?(\d+)/) ? keyword.match(/((R|r)(J|j))?(\d+)/)[4] : '';
+  const workid = keyword.match(/((R|r)(J|j))?(\d{8}|\d{7}|\d{6})/) ? keyword.match(/((R|r)(J|j))?(\d{8}|\d{7}|\d{6})/)[4] : '';
   if (workid) {
     return knex('staticMetadata').select(['staticMetadata.*', 'userrate.rating AS userRating', 'userrate.progress AS userProgress'])
       .leftJoin(ratingSubQuery, 'userrate.work_id', 'staticMetadata.id')
