@@ -188,6 +188,11 @@ const getMetadata = (id, rootFolderName, dir, tagLanguage) => {
             metadata.hasLrc = true
           }
         }
+        metadata.isCHVideo = false
+        const CHFileLoc = path.join(absolutePath, "漢化.txt");
+        if (fs.existsSync(CHFileLoc)) {
+			metadata.isCHVideo = true
+        }
         return metadata
       })
     })
@@ -202,6 +207,7 @@ const getMetadata = (id, rootFolderName, dir, tagLanguage) => {
       metadata.rootFolderName = rootFolderName;
       metadata.dir = dir;
       if (metadata.hasLrc) metadata.tags.push({"id": -1, "name": "中文字幕"})
+      if (metadata.isCHVideo) metadata.tags.push({"id": -2, "name": "中文影片"})
 
       return db.insertWorkMetadata(metadata)
         .then(() => {
